@@ -1,0 +1,4 @@
+Font: Ubuntu Mono
+Corner icons: 75 %
+Middle icons: 125 %
+Ace icons: 125 % two MORE times

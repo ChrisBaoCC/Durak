@@ -1,0 +1,13 @@
+from card import *
+from game import *
+p1 = Player()
+p2 = Player()
+g = Game([p1, p2])
+print([(card.suit, card.rank) for card in p1.hand])
+print([(card.suit, card.rank) for card in p2.hand])
+
+print(g.attacking)
+print(g.defending)
+print(g.trump_suit)
+print([g.can_play_card(0, card) for card in p1.hand])
+print([g.can_play_card(1, card) for card in p2.hand])
