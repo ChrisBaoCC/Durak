@@ -15,6 +15,7 @@ import sys
 
 # Internal imports
 from game import Player
+from card import Card
 
 pygame.freetype.init()
 
@@ -44,6 +45,12 @@ class Client:
     READY_BTN_WIDTH: int = 200
     READY_BTN_HEIGHT: int = 80
 
+    # State constants
+    STATE_START: int = 0
+    STATE_WAIT: int = 1
+    STATE_PLAY: int = 2
+    STATE_END: int = 3
+
     ### Instance variables ###
     socket: s.socket
     """Socket that handles the connection to the server."""
@@ -53,6 +60,9 @@ class Client:
     """Timer for game refresh."""
     window: pygame.Surface
     """Window that holds the UI."""
+
+    state: int
+    """Tracks state of game. See state constants for more info."""
 
     def __init__(self) -> None:
         """
@@ -76,7 +86,11 @@ class Client:
             (Client.WINDOW_WIDTH, Client.WINDOW_HEIGHT))
         self.clock: pygame.time.Clock = pygame.time.Clock()
 
-        self.button = self.Button("Ready!",
+        Card.load_images()
+
+        self.state = Client.STATE_START
+        self.button = self.Button(self.window,
+                                  "Ready!",
                                   (self.WINDOW_WIDTH/2 - self.READY_BTN_WIDTH/2,
                                    self.WINDOW_HEIGHT/2 - self.READY_BTN_HEIGHT/2),
                                   (self.READY_BTN_WIDTH, self.READY_BTN_HEIGHT),
@@ -133,11 +147,12 @@ class Client:
         `None`
         """
         self.window.fill(Client.BG_COLOR)
-        self.button.draw(self.window)
+
+        self.button.draw()
 
         # use the correct cursor
         # selecting button
-        if self.button.rect.collidepoint(pygame.mouse.get_pos()):
+        if self.button.check_hover():
             pygame.mouse.set_cursor(
                 pygame.cursors.Cursor(pygame.SYSTEM_CURSOR_HAND))
         # default arrow
@@ -158,6 +173,9 @@ class Client:
         `None`
         """
         while True:
+            self.clock.tick(60)
+            # self.clock.tick(30)  # temporary, to reduce the number of messages
+
             message = "refresh"
 
             # handle events
@@ -166,18 +184,19 @@ class Client:
                     pygame.quit()
                     sys.exit()
 
-                if event.type == MOUSEBUTTONUP:
-                    if self.button.check_clicked():
+                if event.type == pygame.MOUSEBUTTONUP:
+                    if self.button.check_hover():
+                        self.button.visible = False
                         message = "ready"
+                        self.state = Client.STATE_WAIT
 
             # user_input = input("input here: ")
             # thing = self.send_request(user_input)
 
-            self.clock.tick(60)
-            # self.clock.tick(1)  # temporary, to reduce the number of messages
             thing = self.send_request(message)
-
-            print(thing)
+            # TODO: debug print statement
+            if thing != "received":
+                print(thing)
 
             # draw things
             self.draw()
@@ -191,14 +210,15 @@ class Client:
         BUTTON_FONT: pygame.freetype.Font = pygame.freetype.Font(
             "../res/font/robotoRegular.ttf", 48)
 
-        def __init__(self, text: str, pos: tuple[int, int], size: tuple[int, int],
-                     fg: tuple[int, int, int], bg: tuple[int, int, int],
-                     font: pygame.freetype.Font) -> None:
+        def __init__(self, window: pygame.Surface, text: str, pos: tuple[int, int],
+                     size: tuple[int, int], fg: tuple[int, int, int],
+                     bg: tuple[int, int, int], font: pygame.freetype.Font) -> None:
             """
             Constructor.
 
             Parameters
             ---
+            `window: pygame.Surface` - window this belongs to (is drawn on).
             `text: str` - button text.
             `pos: tuple[int, int]` - position of the button on the window.
             `size: tuple[int, int]` - width and height.
@@ -209,45 +229,51 @@ class Client:
             ---
             `None`
             """
+            self.window: pygame.Surface = window
             self.text: str = text
             self.pos: tuple[int, int] = pos
             self.size: tuple[int, int] = size
-            self.rect = pygame.Rect(*self.pos, *self.size)
+            self.rect: pygame.Rect = pygame.Rect(*self.pos, *self.size)
             self.fg: tuple[int, int, int] = fg
             self.bg: tuple[int, int, int] = bg
             self.font: pygame.font.Font = font
+            self.visible: bool = True
 
-        def draw(self, window: pygame.Surface):
+        def draw(self):
             """
-            Draw this button to the specified window.
+            Draw this button.
 
             Parameters
             ---
-            `window: pygame.Surface` - window to draw on.
+            (no parameters)
 
             Returns
             ---
             `None`
             """
+            if not self.visible:
+                return
+
             fg = self.fg
             bg = self.bg
 
+            # draw box
             # reverse colors when hovered
             if self.rect.collidepoint(pygame.mouse.get_pos()):
                 fg = self.bg
                 bg = self.fg
-            button_rect = pygame.draw.rect(
-                window, bg, self.rect)
+            button_rect = pygame.draw.rect(self.window, bg, self.rect)
             # add outline when hovered
             if self.rect.collidepoint(pygame.mouse.get_pos()):
-                pygame.draw.rect(window, fg, self.rect, width=2)
+                pygame.draw.rect(self.window, fg, self.rect, width=2)
 
+            # draw text
             text_surface = self.font.render(
                 self.text, fg, bg)[0]
             text_rect = text_surface.get_rect(center=button_rect.center)
-            window.blit(text_surface, text_rect)
+            self.window.blit(text_surface, text_rect)
 
-        def check_clicked(self) -> bool:
+        def check_hover(self) -> bool:
             """
                 Check if this button has been clicked.
 
@@ -259,9 +285,7 @@ class Client:
                 ---
                 `bool` - `True` if clicked, `False` otherwise
                 """
-            mouse_x, mouse_y = pygame.mouse.get_pos()
-            return (self.pos[0] <= mouse_x <= self.pos[0] + self.size[0] and
-                    self.pos[1] <= mouse_y <= self.pos[1] + self.size[1])
+            return self.visible and self.rect.collidepoint(pygame.mouse.get_pos())
 
 
 def main() -> None:

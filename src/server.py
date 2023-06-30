@@ -31,6 +31,18 @@ class Server:
     MAX_PLAYERS: int = 6
     """Maximum number of players per game."""
 
+    ##################################
+    # THIS MUST BE SET EVERY GAME!!! #
+    ##################################
+    DESIRED_PLAYERS: int = 2
+    """Set by the host. Number of people to wait for before the game can start."""
+
+    # State constants
+    STATE_START: int = 0
+    STATE_WAIT: int = 1
+    STATE_PLAY: int = 2
+    STATE_END: int = 3
+
     ### Instance variables ###
     socket: s.socket
     """The `socket` that the server uses to connect."""
@@ -43,6 +55,8 @@ class Server:
     """List of (address, port) for clients."""
     players: list[Player]
     """List of players."""
+    state: int
+    """Tracks game state. See state constants for more info."""
 
     def __init__(self) -> None:
         """
@@ -70,6 +84,7 @@ class Server:
         self.client_sockets: list[s.socket] = []
         self.client_addresses: list[tuple[str, int]] = []
         self.players: list[Player] = []
+        self.state = Server.STATE_START
 
         self.socket.listen(Server.MAX_PLAYERS)
         print("Server initialized. Waiting for up to " +
@@ -98,12 +113,11 @@ class Server:
                 if message == "ready":
                     self.ready_count += 1
                     print(f"Player {player_index} is ready!")
+                    if self.ready_count == Server.DESIRED_PLAYERS:
+                        print("All players are ready! Starting game...")
 
-                print("received message:", message)
-
-                # if message == "message":
-                #     # do something
-                #     pass
+                if message != "refresh":
+                    print("received message:", message)
 
                 client.send(str.encode("received"))
             except Exception as e:
@@ -144,6 +158,10 @@ class Server:
             # self.player_count-1 is the index of the player
             start_new_thread(self.threaded_client,
                              (socket, self.player_count-1))
+
+            if self.player_count == Server.DESIRED_PLAYERS:
+                print("All players have joined! Waiting for players to ready...")
+                self.state = Server.STATE_WAIT
 
 
 def main() -> None:

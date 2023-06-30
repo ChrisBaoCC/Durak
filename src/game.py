@@ -172,12 +172,11 @@ class Game:
         for (index, player) in enumerate(self.players):
             for card in player.hand:
                 if card.suit == self.trump_suit and\
-                        card.rank < lowest_trump:
-                    lowest_trump = card.rank
+                        card.value < lowest_trump:
+                    lowest_trump = card.value
                     self.attacking = index
         self.defending: int = (self.attacking + 1) % self.num_players
 
-        # TODO: reminder to reset these after each trick
         self.phase: int = Game.PHASE_ATTACK
         # contains the pairs of cards that are being played/covered
         self.pairs: list[list[Card]] = []
@@ -224,7 +223,7 @@ class Game:
         if card.suit == self.trump_suit and target.suit != self.trump_suit:
             return True
         # else has to be higher and same suit
-        return card.suit == target.suit and card.rank > target.rank
+        return card.suit == target.suit and card.value > target.value
 
     def can_add_to_attack(self, card: Card) -> bool:
         """
@@ -251,7 +250,7 @@ class Game:
 
         for pair in self.pairs:
             for played_card in pair:
-                if card.rank == played_card.rank:
+                if card.value == played_card.value:
                     return True
         return False
 
@@ -296,7 +295,7 @@ class Game:
                     if len(self.players[next_available].hand) <= to_be_covered:
                         return False
 
-                    return card.rank == self.pairs[0][0].rank
+                    return card.value == self.pairs[0][0].value
 
             # player is not the target
             else:
