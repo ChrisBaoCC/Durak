@@ -34,7 +34,7 @@ class Player:
         self.hand: list[Card] = []
         if hand_string is not None:
             for card_string in hand_string.split(" "):
-                if card_string != "" and card_string != "player:":
+                if card_string != "" and card_string != "Player:":
                     self.hand.append(Card(int(card_string)))
 
     def deal_card(self, card: Card) -> None:
@@ -78,7 +78,7 @@ class Player:
         ---
         `str` - space-separated list of card IDs.
         """
-        return " ".join([card.id for card in self.hand])
+        return "Player: " + " ".join([str(card.id) for card in self.hand])
 
 
 class Game:
