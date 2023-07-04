@@ -44,6 +44,9 @@ class Card:
         3: 'd',
     }
 
+    IMG_WIDTH: tuple[int] = 357
+    IMG_HEIGHT: tuple[int] = 499
+
     # Static variables
     images: dict[int, pygame.Surface] = {}
 
@@ -106,16 +109,29 @@ class Card:
             Card.SUIT_CONVERT[suit] + ".png"
 
     # TODO: implement
-    def display(self) -> None:
+    def display(self, surface: pygame.Surface, x: int, y: int, scale: float = 1) -> None:
         """
-        Display this card to the screen.
+        Draw this card to the given surface.
 
         Parameters
         ---
-        (no parameters)
+        `x: int` - x-coordinate of top-left corner.
+        `y: int` - y-coordinate of top-left corner.
+        `scale: float = 1` - scale factor. Must be >= 0.
 
         Returns
         ---
         `None`
+
+        Raises
+        ---
+        `ValueError` - when scale factor < 0.
         """
-        raise NotImplementedError
+        if scale < 0:
+            raise ValueError()
+
+        if scale != 1:
+            scaled = pygame.transform.scale_by(Card.images[self.id], scale)
+            surface.blit(scaled, (x, y))
+        else:
+            surface.blit(Card.images[self.id], (x, y))

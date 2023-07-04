@@ -37,6 +37,19 @@ class Player:
                 if card_string != "" and card_string != "Player:":
                     self.hand.append(Card(int(card_string)))
 
+    def sort_cards(self) -> None:
+        """
+        Arrange cards in the player's hand.
+
+        Parameters
+        ---
+        (no parameters)
+
+        Returns
+        `None`
+        """
+        self.hand.sort(key=lambda card: card.id)
+
     def deal_card(self, card: Card) -> None:
         """
         Receive a card. Called by the `Game` instance.

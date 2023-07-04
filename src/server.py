@@ -28,7 +28,7 @@ class Server:
     IP: str = ""
     """Set to the IP address of whoever's running the server,
     or '' for all connections."""
-    PORT: int = 6666
+    PORT: int = 6667
     """Connection port number. Pretty much arbitrary."""
     BUFFER_SIZE: int = 4096
     """Size of buffer for receiving messages."""
@@ -38,7 +38,7 @@ class Server:
     ##################################
     # THIS MUST BE SET EVERY GAME!!! #
     ##################################
-    DESIRED_PLAYERS: int = 2
+    DESIRED_PLAYERS: int = 1
     """Set by the host. Number of people to wait for before the game can start."""
 
     # State constants
@@ -154,7 +154,7 @@ class Server:
             case "play":
                 # TODO: this has to give more information about game state
                 self.lock.acquire()
-                result = str(self.players[player_index])
+                result = "play " + str(self.players[player_index])
                 self.lock.release()
                 return result
             case "end":
@@ -224,24 +224,30 @@ class Server:
         ---
         `None`
         """
-        while True:
-            socket, address = self.socket.accept()
-            self.client_sockets.append(socket)
-            self.client_addresses.append(address)
-            print(f"Connected to player {self.player_count}:",
-                  address[0], "at", str(address[1])+".")
+        try:
+            while True:
+                socket, address = self.socket.accept()
+                self.client_sockets.append(socket)
+                self.client_addresses.append(address)
+                print(f"Connected to player {self.player_count}:",
+                      address[0], "at", str(address[1])+".")
 
-            new_player = Player()
-            self.players.append(new_player)
-            self.player_count += 1
+                new_player = Player()
+                self.players.append(new_player)
+                self.player_count += 1
 
-            # self.player_count-1 is the index of the player
-            start_new_thread(self.threaded_client,
-                             (socket, self.player_count-1))
+                # self.player_count-1 is the index of the player
+                start_new_thread(self.threaded_client,
+                                 (socket, self.player_count-1))
 
-            if self.player_count == Server.DESIRED_PLAYERS:
-                print("All players have joined! Waiting for players to ready...")
-                self.state = Server.STATE_WAIT
+                if self.player_count == Server.DESIRED_PLAYERS:
+                    print("All players have joined! Waiting for players to ready...")
+                    self.state = Server.STATE_WAIT
+        except:
+            pass
+        finally:
+            print("Closing socket...")
+            self.socket.close()
 
 
 def main() -> None:

@@ -30,7 +30,7 @@ class Client:
     # For IO
     IP: str = "127.0.0.1"  # "71.184.230.103"
     """Set to the IP address of whoever's running the server."""
-    PORT: int = 6666
+    PORT: int = 6667
     """Connection port number. Pretty much arbitrary."""
     BUFFER_SIZE: int = 4096
     """Size of buffer for receiving messages."""
@@ -47,6 +47,10 @@ class Client:
     BOX_FG_COLOR: tuple[int, int, int] = (0, 0, 0)
 
     BOX_PADDING: int = 30  # space between text and edge
+
+    CARD_OFFSET: int = 40  # offset between cards in hand
+    CARD_YPOS: int = 600
+    CARD_YLIFT: int = 100  # amount card moves up by when selected
 
     # State constants
     STATE_START: int = 0
@@ -182,6 +186,30 @@ class Client:
         text_rect.center = box_rect.center
         self.window.blit(text_surface, text_rect)
 
+    def draw_cards(self) -> None:
+        """
+        Draw the cards held by the player.
+
+        Parameters
+        ---
+        (no parameters)
+
+        Returns
+        ---
+        `None`
+        """
+        # TODO draw cards of opponents and deck
+        # TODO figure out what happens if too many cards
+        # TODO figure out how to do glow around selected/valid-to-play card
+
+        left_edge = int(self.WINDOW_WIDTH/2
+                        - len(self.player.hand)/2 * Client.CARD_OFFSET
+                        - Card.IMG_WIDTH/4)
+
+        for (index, card) in enumerate(self.player.hand):
+            card.display(self.window, left_edge + index *
+                         Client.CARD_OFFSET, Client.CARD_YPOS, 0.5)
+
     def draw(self) -> None:
         """
         Draw everything to the window.
@@ -222,8 +250,7 @@ class Client:
                     pygame.cursors.Cursor(pygame.SYSTEM_CURSOR_ARROW))
 
             case Client.STATE_PLAY:
-                if self.announcement != "":
-                    self.draw_announcement()
+                self.draw_cards()
 
                 # default arrow
                 pygame.mouse.set_cursor(
@@ -282,7 +309,9 @@ class Client:
                     else:
                         self.announcement = f"Waiting for players to ready..." +\
                             f"{wait_counter[0]}/{wait_counter[1]} ready."
-
+                case "play":
+                    self.player = Player(reply[len("play "):])
+                    self.player.sort_cards()
             # draw things
             self.draw()
             pygame.display.update()
