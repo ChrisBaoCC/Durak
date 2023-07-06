@@ -38,7 +38,7 @@ class Server:
     ##################################
     # THIS MUST BE SET EVERY GAME!!! #
     ##################################
-    DESIRED_PLAYERS: int = 1
+    DESIRED_PLAYERS: int = 2
     """Set by the host. Number of people to wait for before the game can start."""
 
     # State constants
@@ -154,11 +154,36 @@ class Server:
             case "play":
                 # TODO: this has to give more information about game state
                 self.lock.acquire()
-                result = "play " + str(self.players[player_index])
+                result = self.generate_gamestate_string(player_index)
                 self.lock.release()
                 return result
             case "end":
                 return ""  # TODO
+    
+    def generate_gamestate_string(self, player_index: int) -> str:
+        """
+        Generate a string representing the gamestate for a
+        particular player.
+        
+        Parameters
+        ---
+        `player_index: int` - player to send to.
+        
+        Returns
+        `str`
+        """
+        # what cards do I have?
+        # how many cards do other players have?
+        # what is on the board?
+        # what is the deck like?
+        return "play "\
+                         + str(len(self.players[player_index].hand)) + " "\
+                         + str(self.players[player_index]) + " "\
+                         + str(self.player_count - 1) + " "\
+                         + " ".join([str(len(self.players[i].hand))
+                                     for i in self.player_count
+                                     if i != player_index]) + " "\
+                         + self.game.attacking
 
     def threaded_client(self, client: s.socket, player_index: int) -> None:
         """

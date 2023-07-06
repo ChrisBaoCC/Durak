@@ -45,12 +45,14 @@ class Client:
     BG_COLOR: tuple[int, int, int] = (0, 0, 0)
     BOX_BG_COLOR: tuple[int, int, int] = (255, 255, 255)
     BOX_FG_COLOR: tuple[int, int, int] = (0, 0, 0)
+    HIGHLIGHT_COLOR: tuple[int, int, int] = (128, 0, 128)
+    SELECTED_COLOR: tuple[int, int, int] = (255, 191, 0)
 
     BOX_PADDING: int = 30  # space between text and edge
 
     CARD_OFFSET: int = 40  # offset between cards in hand
-    CARD_YPOS: int = 600
-    CARD_YLIFT: int = 100  # amount card moves up by when selected
+    CARD_YPOS: int = 750
+    CARD_YLIFT: int = 50  # amount card moves up by when selected
 
     # State constants
     STATE_START: int = 0
@@ -75,6 +77,11 @@ class Client:
     """Holds any big messages to display."""
     announcement_sticky: bool
     """Toggle for whether announcement will persist between refreshes."""
+
+    hovered_card: int
+    """Index of card that mouse is hovering over, or -1 if none."""
+    selected_card: int
+    """Index of card that player has selected (clicked on), or -1 if none."""
 
     flip_sound: pygame.mixer.Sound
     tap_sound: pygame.mixer.Sound
@@ -110,7 +117,6 @@ class Client:
         Card.load_images()
 
         self.state: int = Client.STATE_START
-        self.mouse_hovering: bool = False
         self.button: Client.Button = self.Button(self.window,
                                                  "I'm ready!",
                                                  (self.WINDOW_WIDTH/2,
@@ -118,6 +124,9 @@ class Client:
                                                  self.BOX_FG_COLOR,
                                                  self.BOX_BG_COLOR,
                                                  self.MEDIUM_FONT)
+        
+        self.hovered_card: int = -1
+        self.selected_card: int = -1
 
         self.announcement: str = ""
         self.announcement_sticky = False
@@ -204,11 +213,47 @@ class Client:
 
         left_edge = int(self.WINDOW_WIDTH/2
                         - len(self.player.hand)/2 * Client.CARD_OFFSET
-                        - Card.IMG_WIDTH/4)
+                        - Card.IMG_WIDTH/5)
+
+        prev = self.hovered_card
+        selected = -1
+        for (index, card) in enumerate(self.player.hand):
+            if card.touching((left_edge + index * Client.CARD_OFFSET,
+                             Client.CARD_YPOS),
+                             pygame.mouse.get_pos()):
+                selected = index
+        self.hovered_card = selected
+        if self.hovered_card != -1 and self.hovered_card != prev:
+            self.flip_sound.play()
 
         for (index, card) in enumerate(self.player.hand):
-            card.display(self.window, left_edge + index *
-                         Client.CARD_OFFSET, Client.CARD_YPOS, 0.5)
+            if index == self.selected_card:
+                # draw highlight
+                pygame.draw.rect(self.window,
+                                 Client.SELECTED_COLOR,
+                                 pygame.Rect(left_edge + index * Client.CARD_OFFSET-5,
+                                             Client.CARD_YPOS - Client.CARD_YLIFT-5,
+                                             Card.IMG_WIDTH+10,
+                                             Card.IMG_HEIGHT+10),
+                                 width=6,
+                                 border_radius=15)
+                card.display(self.window, left_edge + index * Client.CARD_OFFSET,
+                             Client.CARD_YPOS - Client.CARD_YLIFT)
+            elif index == self.hovered_card:
+                # draw highlight
+                pygame.draw.rect(self.window,
+                                 Client.HIGHLIGHT_COLOR,
+                                 pygame.Rect(left_edge + index * Client.CARD_OFFSET-5,
+                                             Client.CARD_YPOS - Client.CARD_YLIFT-5,
+                                             Card.IMG_WIDTH+10,
+                                             Card.IMG_HEIGHT+10),
+                                 width=6,
+                                 border_radius=15)
+                card.display(self.window, left_edge + index * Client.CARD_OFFSET,
+                             Client.CARD_YPOS - Client.CARD_YLIFT)
+            else:
+                card.display(self.window, left_edge + index *
+                         Client.CARD_OFFSET, Client.CARD_YPOS)
 
     def draw(self) -> None:
         """
@@ -239,7 +284,6 @@ class Client:
                 else:
                     pygame.mouse.set_cursor(
                         pygame.cursors.Cursor(pygame.SYSTEM_CURSOR_ARROW))
-                    self.mouse_hovering = False
 
             case Client.STATE_WAIT:
                 if self.announcement != "":
@@ -255,6 +299,21 @@ class Client:
                 # default arrow
                 pygame.mouse.set_cursor(
                     pygame.cursors.Cursor(pygame.SYSTEM_CURSOR_ARROW))
+
+    def handle_server_reply(self, reply: str) -> None:
+        """
+        Update the player given the server's info.
+        
+        Parameters
+        ---
+        `reply: str` - server message.
+        
+        Returns
+        ---
+        `None`
+        """
+        self.player = Player(reply[len("play "):])
+        self.player.sort_cards()
 
     def mainloop(self) -> None:
         """
@@ -291,11 +350,19 @@ class Client:
                     sys.exit()
 
                 if event.type == pygame.MOUSEBUTTONUP:
+                    # ready button
                     if self.button.check_hover():
                         self.tap_sound.play()
                         self.button.visible = False
                         message = "ready"
                         self.state = Client.STATE_WAIT
+
+                    # playing cards
+                    if self.hovered_card != -1:
+                        self.selected_card = self.hovered_card
+                        self.tap_sound.play()
+                    else:
+                        self.selected_card = -1
 
             # handle updates from server
             reply = self.send_request(message)
@@ -310,8 +377,8 @@ class Client:
                         self.announcement = f"Waiting for players to ready..." +\
                             f"{wait_counter[0]}/{wait_counter[1]} ready."
                 case "play":
-                    self.player = Player(reply[len("play "):])
-                    self.player.sort_cards()
+                    self.handle_server_reply(reply)
+                    
             # draw things
             self.draw()
             pygame.display.update()

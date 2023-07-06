@@ -44,8 +44,8 @@ class Card:
         3: 'd',
     }
 
-    IMG_WIDTH: tuple[int] = 357
-    IMG_HEIGHT: tuple[int] = 499
+    IMG_WIDTH: tuple[int] = 179
+    IMG_HEIGHT: tuple[int] = 250
 
     # Static variables
     images: dict[int, pygame.Surface] = {}
@@ -64,8 +64,8 @@ class Card:
         """
         # TODO: load card back
         for id in range(0, 52):
-            Card.images[id] = pygame.image.load(
-                Card.get_path(id)).convert_alpha()
+            Card.images[id] = pygame.transform.scale_by(pygame.image.load(
+                Card.get_path(id)).convert_alpha(), 0.5)
 
     def __init__(self, id: int) -> None:
         """
@@ -108,7 +108,24 @@ class Card:
         return "../res/card/" + Card.VALUE_CONVERT[value] +\
             Card.SUIT_CONVERT[suit] + ".png"
 
-    # TODO: implement
+    def touching(self, top_left: tuple[int, int], point: tuple[int, int]) -> bool:
+        """
+        Determine whether the card is touching the given point when
+        drawn at the given position.
+        
+        Parameters
+        ---
+        `top_left: tuple[int, int]` - coordinates of top left corner.
+        `point: tuple[int, int]` - coordinates to check.
+        
+        Returns
+        ---
+        `bool`
+        """
+        rect = Card.images[self.id].get_rect()
+        rect.x, rect.y = top_left
+        return rect.collidepoint(*point)
+
     def display(self, surface: pygame.Surface, x: int, y: int, scale: float = 1) -> None:
         """
         Draw this card to the given surface.
