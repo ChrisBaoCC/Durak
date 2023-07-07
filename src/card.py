@@ -21,6 +21,8 @@ class Card:
     CLUBS: int = 2
     DIAMONDS: int = 3
 
+    BACK: int = 52
+
     VALUE_CONVERT: dict[int, str] = {
         0: 'a',
         1: '2',
@@ -44,8 +46,8 @@ class Card:
         3: 'd',
     }
 
-    IMG_WIDTH: tuple[int] = 179
-    IMG_HEIGHT: tuple[int] = 250
+    IMG_WIDTH: int = 179
+    IMG_HEIGHT: int = 250
 
     # Static variables
     images: dict[int, pygame.Surface] = {}
@@ -62,10 +64,14 @@ class Card:
         ---
         `None`
         """
-        # TODO: load card back
+        # card images
         for id in range(0, 52):
             Card.images[id] = pygame.transform.scale_by(pygame.image.load(
                 Card.get_path(id)).convert_alpha(), 0.5)
+        
+        # card back
+        Card.images[52] = pygame.transform.scale_by(pygame.image.load(
+            "../res/card/back.png").convert_alpha(), 0.5)
 
     def __init__(self, id: int) -> None:
         """
@@ -73,7 +79,8 @@ class Card:
 
         Parameters
         ---
-        `id: int` - card ID number, within the range [0, 52).
+        `id: int` - card ID number, within the range [0, 52) if normal.
+        Special id 52 represents the card back.
 
         Raises
         ---
@@ -83,12 +90,15 @@ class Card:
         ---
         `None`
         """
-        if id not in range(0, 52):
-            raise ValueError("id must be in range [0, 52)")
+        if id not in range(0, 53):
+            raise ValueError("id must be in range [0, 52) or be 52")
 
         self.id: int = id
-        self.suit: int = id // 13
-        self.value: int = id % 13
+        if id < 52:
+            self.suit: int = id // 13
+            self.value: int = id % 13
+        else:
+            self.suit = self.value = -1
         self.image: pygame.Surface = Card.images[id]
 
     def get_path(id: int) -> str:
@@ -126,29 +136,20 @@ class Card:
         rect.x, rect.y = top_left
         return rect.collidepoint(*point)
 
-    def display(self, surface: pygame.Surface, x: int, y: int, scale: float = 1) -> None:
+
+    def display(self, surface: pygame.Surface, x: int, y: int, angle: int=0) -> None:
         """
         Draw this card to the given surface.
 
         Parameters
         ---
+        `surface: pygame.Surface` - screen to draw on.
         `x: int` - x-coordinate of top-left corner.
         `y: int` - y-coordinate of top-left corner.
-        `scale: float = 1` - scale factor. Must be >= 0.
+        `angle: int=0` - rotation.
 
         Returns
         ---
         `None`
-
-        Raises
-        ---
-        `ValueError` - when scale factor < 0.
         """
-        if scale < 0:
-            raise ValueError()
-
-        if scale != 1:
-            scaled = pygame.transform.scale_by(Card.images[self.id], scale)
-            surface.blit(scaled, (x, y))
-        else:
-            surface.blit(Card.images[self.id], (x, y))
+        surface.blit(pygame.transform.rotate(Card.images[self.id], angle), (x, y))

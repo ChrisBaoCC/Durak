@@ -30,9 +30,9 @@ class Server:
     or '' for all connections."""
     PORT: int = 6667
     """Connection port number. Pretty much arbitrary."""
-    BUFFER_SIZE: int = 4096
+    BUFFER_SIZE: int = 8192
     """Size of buffer for receiving messages."""
-    MAX_PLAYERS: int = 6
+    MAX_PLAYERS: int = 4
     """Maximum number of players per game."""
 
     ##################################
@@ -59,6 +59,8 @@ class Server:
     """List of (address, port) for clients."""
     players: list[Player]
     """List of players."""
+    player_names: list[str]
+    """List of player names."""
     state: int
     """Tracks game state. See state constants for more info."""
     lock: Lock
@@ -99,6 +101,7 @@ class Server:
         self.client_sockets: list[s.socket] = []
         self.client_addresses: list[tuple[str, int]] = []
         self.players: list[Player] = []
+        self.player_names: list[str] = []
         self.state = Server.STATE_START
 
         self.lock = Lock()
@@ -146,7 +149,7 @@ class Server:
         ---
         `str` - message.
         """
-        match input:
+        match input.split()[0]:
             case "start":
                 return "start"
             case "wait" | "ready":
@@ -172,18 +175,26 @@ class Server:
         Returns
         `str`
         """
-        # what cards do I have?
-        # how many cards do other players have?
-        # what is on the board?
-        # what is the deck like?
-        return "play "\
-                         + str(len(self.players[player_index].hand)) + " "\
-                         + str(self.players[player_index]) + " "\
-                         + str(self.player_count - 1) + " "\
-                         + " ".join([str(len(self.players[i].hand))
-                                     for i in self.player_count
-                                     if i != player_index]) + " "\
-                         + self.game.attacking
+        reply = "play\n"
+        # player current hand
+        reply += str(self.players[player_index]) + "\n"
+        # player current index
+        reply += f"{player_index}\n"
+        # players' hand sizes
+        reply += " ".join([str(len(self.players[i].hand))
+                           for i in range(self.player_count)]) + "\n"
+        # who is attacking/defending
+        reply += f"{self.game.attacking} {self.game.defending}\n"
+        # deck size and last card
+        if len(self.game.deck) > 0:
+            reply += f"{len(self.game.deck)} {self.game.deck[-1].id}\n"
+        else:
+            reply += f"{len(self.game.deck)} {-1}\n"
+        # other players' names
+        reply += "`".join(self.player_names) + "\n"
+        # DEBUG
+        # print(reply)
+        return reply
 
     def threaded_client(self, client: s.socket, player_index: int) -> None:
         """
@@ -204,13 +215,18 @@ class Server:
         to_do = deque()
         while True:
             try:
-                message = client.recv(4096).decode()
+                message = client.recv(Server.BUFFER_SIZE).decode()
 
-                if message == "ready":
-                    self.ready_count += 1
-                    print(f"Player {player_index} is ready!")
-                    if self.ready_count == Server.DESIRED_PLAYERS:
-                        to_do.appendleft("start game")
+                match message.split()[0]:
+                    case "ready":
+                        self.ready_count += 1
+                        print(f"Player {player_index} is ready!")
+                        if self.ready_count == Server.DESIRED_PLAYERS:
+                            to_do.appendleft("start game")
+                    case "start":
+                        self.player_names[player_index] = message[len("start "):]
+
+                print(self.player_names[player_index])
 
                 # DEBUG
                 # if message != "refresh":
@@ -260,6 +276,7 @@ class Server:
                 new_player = Player()
                 self.players.append(new_player)
                 self.player_count += 1
+                self.player_names.append("Unknown Player")
 
                 # self.player_count-1 is the index of the player
                 start_new_thread(self.threaded_client,

@@ -13,10 +13,12 @@ import pygame.freetype
 import pygame.mixer
 from pygame.locals import *
 import sys
+import easygui
 
 # Internal imports
 from game import Player
 from card import Card
+from server import Server
 
 pygame.freetype.init()
 
@@ -30,9 +32,9 @@ class Client:
     # For IO
     IP: str = "127.0.0.1"  # "71.184.230.103"
     """Set to the IP address of whoever's running the server."""
-    PORT: int = 6667
+    PORT: int = Server.PORT
     """Connection port number. Pretty much arbitrary."""
-    BUFFER_SIZE: int = 4096
+    BUFFER_SIZE: int = 8192
     """Size of buffer for receiving messages."""
 
     # For UI
@@ -47,12 +49,18 @@ class Client:
     BOX_FG_COLOR: tuple[int, int, int] = (0, 0, 0)
     HIGHLIGHT_COLOR: tuple[int, int, int] = (128, 0, 128)
     SELECTED_COLOR: tuple[int, int, int] = (255, 191, 0)
+    CARD_EDGE_COLOR: tuple[int, int, int] = (128, 128, 128)
 
     BOX_PADDING: int = 30  # space between text and edge
 
     CARD_OFFSET: int = 40  # offset between cards in hand
     CARD_YPOS: int = 750
     CARD_YLIFT: int = 50  # amount card moves up by when selected
+
+    ACROSS_YPOS: int = -100
+
+    DECK_XPOS: int = 75
+    DECK_YPOS: int = 600
 
     # State constants
     STATE_START: int = 0
@@ -61,6 +69,8 @@ class Client:
     STATE_END: int = 3
 
     ### Instance variables ###
+    name: str
+    """Player name."""
     socket: s.socket
     """Socket that handles the connection to the server."""
     player: Player
@@ -83,21 +93,38 @@ class Client:
     selected_card: int
     """Index of card that player has selected (clicked on), or -1 if none."""
 
+    player_index: int
+    """Player number in the game (has to do with play order)."""
+    players_hand_sizes: list[int]
+    """List of players' hand sizes."""
+    players_names: list[str]
+    """List of player names."""
+    attacking_index: int
+    """Index of attacking player."""
+    defending_index: int
+    """Index of defending player."""
+    deck_size: int
+    """Number of cards left in the deck."""
+    bottom_card: Card
+    """Card visible on the bottom."""
+
     flip_sound: pygame.mixer.Sound
     tap_sound: pygame.mixer.Sound
 
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
         """
         Constructor.
 
         Parameters
         ---
-        (no parameters)
+        `name: str` - player name.
 
         Returns
         ---
         `None`
         """
+        self.name: str = name
+
         self.socket: s.socket = s.socket(s.AF_INET, s.SOCK_STREAM)
         self.player: Player = Player(self.connect())
 
@@ -127,6 +154,14 @@ class Client:
         
         self.hovered_card: int = -1
         self.selected_card: int = -1
+
+        self.player_index: int = 0
+        self.players_hand_sizes: list[int] = []
+        self.players_names: list[str] = []
+        self.attacking_index: int = 0
+        self.defending_index: int = 0
+        self.deck_size: int = 0
+        self.bottom_card: Card = None
 
         self.announcement: str = ""
         self.announcement_sticky = False
@@ -195,7 +230,42 @@ class Client:
         text_rect.center = box_rect.center
         self.window.blit(text_surface, text_rect)
 
-    def draw_cards(self) -> None:
+    def draw_opponent_cards(self) -> None:
+        """
+        Draw the cards held by opponents.
+        
+        Parameters
+        ---
+        (no parameters)
+        
+        Returns
+        ---
+        `None`
+        """
+        if self.players_hand_sizes is None:
+            return
+        
+        match len(self.players_hand_sizes):
+            case 2: # 1 opponent
+                # math trick that toggles between 1 and 0
+                opponent_index = 1 - self.player_index
+                opponent_hand_size = self.players_hand_sizes[opponent_index]
+                left_edge = int(self.WINDOW_WIDTH/2
+                        - opponent_hand_size/2 * Client.CARD_OFFSET
+                        - Card.IMG_WIDTH/5)
+                
+                back = Card(52)
+                for i in range(opponent_hand_size):
+                    back.display(self.window, left_edge + i * Client.CARD_OFFSET,
+                                 Client.ACROSS_YPOS, angle=180)
+            case 3:
+                # TODO: implement
+                pass
+            case 4:
+                # TODO: implement
+                pass
+
+    def draw_player_cards(self) -> None:
         """
         Draw the cards held by the player.
 
@@ -207,10 +277,7 @@ class Client:
         ---
         `None`
         """
-        # TODO draw cards of opponents and deck
         # TODO figure out what happens if too many cards
-        # TODO figure out how to do glow around selected/valid-to-play card
-
         left_edge = int(self.WINDOW_WIDTH/2
                         - len(self.player.hand)/2 * Client.CARD_OFFSET
                         - Card.IMG_WIDTH/5)
@@ -252,8 +319,39 @@ class Client:
                 card.display(self.window, left_edge + index * Client.CARD_OFFSET,
                              Client.CARD_YPOS - Client.CARD_YLIFT)
             else:
+                # draw slight edge
+                pygame.draw.rect(self.window,
+                                 Client.CARD_EDGE_COLOR,
+                                 pygame.Rect(left_edge + index * Client.CARD_OFFSET-2,
+                                             Client.CARD_YPOS-2,
+                                             Card.IMG_WIDTH+4,
+                                             Card.IMG_HEIGHT+4),
+                                 width=3,
+                                 border_radius=11)
                 card.display(self.window, left_edge + index *
                          Client.CARD_OFFSET, Client.CARD_YPOS)
+
+    def draw_deck(self) -> None:
+        """
+        Draw the remaining deck of cards.
+        
+        Parameters
+        ---
+        (no parameters)
+
+        Returns
+        ---
+        `None`
+        """
+        if self.bottom_card is not None:
+            self.bottom_card.display(self.window,
+                                     Client.DECK_XPOS,
+                                     Client.DECK_YPOS + int(Card.IMG_WIDTH/4),
+                                     angle=270)
+        for i in range(self.deck_size-1):
+            c = Card(52)
+            c.display(self.window, Client.DECK_XPOS, Client.DECK_YPOS-int(i/2))
+        
 
     def draw(self) -> None:
         """
@@ -294,7 +392,9 @@ class Client:
                     pygame.cursors.Cursor(pygame.SYSTEM_CURSOR_ARROW))
 
             case Client.STATE_PLAY:
-                self.draw_cards()
+                self.draw_player_cards()
+                self.draw_opponent_cards()
+                self.draw_deck()
 
                 # default arrow
                 pygame.mouse.set_cursor(
@@ -312,8 +412,24 @@ class Client:
         ---
         `None`
         """
-        self.player = Player(reply[len("play "):])
+        lines = reply.split("\n")[1:]
+        # update player
+        self.player = Player(lines[0])
         self.player.sort_cards()
+        # update game state
+        self.player_index = int(lines[1])
+        self.players_hand_sizes = [int(i) for i in lines[2].split(" ")]
+        self.attacking_index = int(lines[3][0])
+        self.defending_index = int(lines[3][2])
+        
+        deck_info = lines[4].split(" ")
+        self.deck_size = int(deck_info[0])
+        if self.deck_size > 0:
+            self.bottom_card = Card(int(deck_info[1]))
+        else:
+            self.bottom_card = None
+        # player names
+        self.players_names = lines[5].split("`")
 
     def mainloop(self) -> None:
         """
@@ -333,7 +449,7 @@ class Client:
 
             match self.state:
                 case Client.STATE_START:
-                    message = "start"
+                    message = "start " + self.name
                 case Client.STATE_WAIT:
                     message = "wait"
                 case Client.STATE_PLAY:
@@ -485,7 +601,10 @@ def main() -> None:
     ---
     `None`
     """
-    client = Client()
+    name = easygui.enterbox(msg="What would you like to be called?",
+                            title="Welcome to Durak!",
+                            image="../res/icon/appicon.png")
+    client = Client(name)
     client.mainloop()
 
 
