@@ -226,8 +226,6 @@ class Server:
                     case "start":
                         self.player_names[player_index] = message[len("start "):]
 
-                print(self.player_names[player_index])
-
                 # DEBUG
                 # if message != "refresh":
                 #     print("received message:", message)

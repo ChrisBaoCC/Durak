@@ -184,6 +184,10 @@ class Client:
         except Exception as e:
             print(e)
 
+    # TODO get names to appear and change color for attack/defend
+    # modify and use the display announcement function to display
+    # arbitrary text boxes
+
     def send_request(self, message: str) -> str:
         """
         Send data to and request data from the server.
@@ -319,15 +323,15 @@ class Client:
                 card.display(self.window, left_edge + index * Client.CARD_OFFSET,
                              Client.CARD_YPOS - Client.CARD_YLIFT)
             else:
-                # draw slight edge
+                # draw a slight edge
                 pygame.draw.rect(self.window,
                                  Client.CARD_EDGE_COLOR,
-                                 pygame.Rect(left_edge + index * Client.CARD_OFFSET-2,
-                                             Client.CARD_YPOS-2,
-                                             Card.IMG_WIDTH+4,
-                                             Card.IMG_HEIGHT+4),
-                                 width=3,
-                                 border_radius=11)
+                                 pygame.Rect(left_edge + index * Client.CARD_OFFSET-1,
+                                             Client.CARD_YPOS-1,
+                                             Card.IMG_WIDTH+2,
+                                             Card.IMG_HEIGHT+2),
+                                 width=2,
+                                 border_radius=10)
                 card.display(self.window, left_edge + index *
                          Client.CARD_OFFSET, Client.CARD_YPOS)
 
